@@ -1,0 +1,64 @@
+WHITESPACE = _{ " " | "\t" }
+NEWLINE = _{ "\n" | "\r\n" }
+
+program = {  command_list  }
+
+command_list = { command ~ (NEWLINE+ ~ command)* }
+
+command = _{ if_clause | simple_command }
+
+if_clause = { "if" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "then" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "fi" }
+
+simple_command = { ( builtin_command | command_name ) ~ (argument)* }
+
+command_name = @{ ASCII_ALPHANUMERIC+ }
+argument = @{ (!WHITESPACE ~ ANY)+ }
+
+
+builtin_command =    { 
+                       colon | dot | alias | 
+                       bg | break_builtin | cd | 
+                       command_builtin | continue_builtin | 
+                       eval | exec | exit_builtin | 
+                       export | fc | fg | getopts | 
+                       hash_builtin | jobs | kill | 
+                       pwd | read | readonly | 
+                       return_builtin | set_builtin | 
+                       shift | test_builtin | times | 
+                       trap | type_builtin | ulimit | 
+                       umask | unalias | unset | wait 
+                     }
+    colon              = { ":" }
+    dot                = { "." }
+    alias              = { "alias" }
+    bg                 = { "bg" }
+    break_builtin      = { "break" }
+    cd                 = { "cd" }
+    command_builtin    = { "command" }
+    continue_builtin   = { "continue" }
+    eval               = { "eval" }
+    exec               = { "exec" }
+    exit_builtin       = { "exit" }
+    export             = { "export" }
+    fc                 = { "fc" }
+    fg                 = { "fg" }
+    getopts            = { "getopts" }
+    hash_builtin       = { "hash" }
+    jobs               = { "jobs" }
+    kill               = { "kill" }
+    pwd                = { "pwd" }
+    read               = { "read" }
+    readonly           = { "readonly" }
+    return_builtin     = { "return" }
+    set_builtin        = { "set" }
+    shift              = { "shift" }
+    test_builtin       = { "test" | "[" } // test and [
+    times              = { "times" }
+    trap               = { "trap" }
+    type_builtin       = { "type" }
+    ulimit             = { "ulimit" }
+    umask              = { "umask" }
+    unalias            = { "unalias" }
+    unset              = { "unset" }
+    wait               = { "wait" }
+

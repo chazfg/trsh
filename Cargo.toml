@@ -1,0 +1,10 @@
+[package]
+name = "trsh"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dirs = "6.0.0"
+pest = "2.7.15"
+pest_derive = "2.7.15"
+rustyline = "15.0.0"
