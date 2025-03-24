@@ -1,4 +1,8 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use crate::ParsedPair;
+use crate::ast::Command;
 use crate::prsr::Rule;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -39,8 +43,8 @@ pub enum Builtin {
 }
 
 impl Builtin {
-    pub fn new(rule: ParsedPair<'_>) -> Self {
-        match rule.as_rule() {
+    pub fn new(rule: Rule) -> Self {
+        match rule {
             Rule::colon => Self::Colon,
             Rule::dot => Self::Dot,
             Rule::alias => Self::Alias,
@@ -82,15 +86,8 @@ impl Builtin {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum CmdName {
     Builtin(Builtin),
+    Path(PathBuf),
+    Alias(String),
+    Function(String),
     Unknown(String),
-}
-
-impl CmdName {
-    pub fn new(rule: ParsedPair<'_>) -> Self {
-        match rule.as_rule() {
-            Rule::command_name => Self::Unknown(rule.as_str().to_owned()),
-            Rule::builtin_command => Self::Builtin(Builtin::new(rule.into_inner().next().unwrap())),
-            r => panic!("got {r:?} for a cmd name"),
-        }
-    }
 }

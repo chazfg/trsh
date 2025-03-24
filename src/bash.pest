@@ -1,21 +1,23 @@
-WHITESPACE = _{ " " | "\t" }
-NEWLINE = _{ "\n" | "\r\n" }
+SEMICOLON           = _{ ";" }
+WHITESPACE          = _{ " " | "\t" }
+NEWLINE             = _{ "\n" | "\r\n" }
+CMD_DELIM           = _{ NEWLINE | SEMICOLON }
 
-program = {  command_list  }
+program             = { command_list }
+command_list        = { command ~ (CMD_DELIM+ ~ command)* }
+command             = _{ if_clause | simple_command }
+if_clause           = { "if" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "then" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "fi" }
+simple_command      = { ( builtin_command | command_name ) ~ args }
+command_name        = @{ ASCII_ALPHANUMERIC+ }
 
-command_list = { command ~ (NEWLINE+ ~ command)* }
+args = @{ (!SEMICOLON ~ !NEWLINE ~ ANY)* }
 
-command = _{ if_clause | simple_command }
-
-if_clause = { "if" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "then" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "fi" }
-
-simple_command = { ( builtin_command | command_name ) ~ (argument)* }
-
-command_name = @{ ASCII_ALPHANUMERIC+ }
-argument = @{ (!WHITESPACE ~ ANY)+ }
+//argument            = _{ ANY ~ (";" | NEWLINE) }
+//argument   = @{ (("-" | "--")? ~ ASCII_ALPHANUMERIC)+ }
+//quoted_argument     = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
 
-builtin_command =    { 
+builtin_command     = { 
                        colon | dot | alias | 
                        bg | break_builtin | cd | 
                        command_builtin | continue_builtin | 

@@ -1,8 +1,12 @@
 mod ast;
+use clap::Parser as ClapParser;
 mod builtins;
 mod executor;
 mod prsr;
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use ast::Command;
 use executor::Executor;
@@ -18,7 +22,29 @@ type ParsedIterResult<'a> =
 type TrshResult<C> = Result<C, TrshError>;
 type ParsedIter<'a> = pest::iterators::Pairs<'a, prsr::Rule>;
 type ParsedPair<'a> = Pair<'a, Rule>;
+
 fn main() {
+    match CliTrshArgs::parse() {
+        CliTrshArgs {
+            script_file: None,
+            cmd: None,
+        } => repl(),
+        CliTrshArgs {
+            script_file: Some(script_file),
+            cmd: None,
+        } => {
+            let s = std::fs::read_to_string(script_file).expect("failed to read file");
+            run_once(&s);
+        }
+        CliTrshArgs {
+            script_file: None,
+            cmd: Some(cmd),
+        } => run_once(&cmd),
+        _ => panic!("got weird input"),
+    }
+}
+
+fn repl() {
     let config = Config::builder().auto_add_history(true).build();
     let mut history = DefaultHistory::new();
     let h = Path::new("hist");
@@ -32,7 +58,7 @@ fn main() {
                 TrshPrsr::parse(Rule::program, &readline)
                     // .inspect(|e| println!("{:?}", e))
                     .map_err(|e| TrshError::Pest(Box::new(e)))
-                    .and_then(|mut r| Program::new(r.next().unwrap()))
+                    .and_then(|mut r| Program::new(r.next().unwrap(), executor.env()))
                     .and_then(|prog| executor.exec(prog.0))
                     .map(|_| {})
                     .map_err(|e| eprintln!("{e:?}"))
@@ -42,23 +68,28 @@ fn main() {
         }
     }
 }
-fn root_ast(rules: ParsedIterResult<'_>) {
-    match rules {
-        Ok(parsed_iter) => {
-            for p in parsed_iter {
-                println!("{p:?}");
-            }
-        }
-        Err(_) => todo!(),
-    }
+
+fn run_once(s: &str) {
+    let mut executor = Executor::new();
+    TrshPrsr::parse(Rule::program, s)
+        // .inspect(|e| println!("{:?}", e))
+        .map_err(|e| TrshError::Pest(Box::new(e)))
+        .and_then(|mut r| Program::new(r.next().unwrap(), executor.env()))
+        .and_then(|prog| executor.exec(prog.0))
+        .map(|_| {})
+        .map_err(|e| eprintln!("{e:?}"))
+        .ok();
 }
 
 #[derive(Debug)]
 struct Program(pub Command);
 impl Program {
-    pub fn new(rule: ParsedPair<'_>) -> TrshResult<Self> {
+    pub fn new(
+        rule: ParsedPair<'_>,
+        env: (&HashMap<String, String>, &HashMap<String, String>),
+    ) -> TrshResult<Self> {
         let mut rules = rule.into_inner();
-        Ok(Self(Command::new(rules.next().unwrap())?))
+        Ok(Self(Command::new(rules.next().unwrap(), env)?))
     }
 }
 
@@ -88,4 +119,12 @@ enum AstError {
 enum ExecError {
     Failed,
     UnknownCmd,
+}
+
+#[derive(clap::Parser, Debug)]
+struct CliTrshArgs {
+    #[arg(conflicts_with("cmd"))]
+    script_file: Option<PathBuf>,
+    #[arg(short = 'c', conflicts_with("script_file"))]
+    cmd: Option<String>,
 }

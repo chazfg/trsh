@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.5.32", features = ["cargo", "derive"] }
 dirs = "6.0.0"
 pest = "2.7.15"
 pest_derive = "2.7.15"
