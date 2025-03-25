@@ -1,21 +1,56 @@
+METACHAR = { PIPE | AMPERSAND | L_PAREN | R_PAREN | L_ANGLE | R_ANGLE | SEMICOLON | WHITESPACE | NEWLINE | CMD_DELIM }
+PIPE                = { "|" }
+AMPERSAND           = { "&" }
+L_PAREN             = { "(" }
+R_PAREN             = { ")" }
+L_ANGLE             = { "<" }
+R_ANGLE             = { ">" }
 SEMICOLON           = _{ ";" }
 WHITESPACE          = _{ " " | "\t" }
 NEWLINE             = _{ "\n" | "\r\n" }
 CMD_DELIM           = _{ NEWLINE | SEMICOLON }
 
+ASSIGNMENT = @{ WORD ~ "=" ~ QUOTE}
+WORD = @{ "-"? ~ "-"? ~ ASCII_ALPHANUMERIC+ }
+QUOTE = ${ "\"" ~ inner ~ "\"" }
+inner = @{ char* }
+char = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+//control_operator     = _{}
+    two_pipe           = { "||" }
+    two_and            = { "&&" }
+    and                = { "&" }
+    semicolon          = { ";" }
+    two_semi           = { ";;" }
+    semi_and           = { ";&" }
+    two_semi_and       = { ";;&" }
+    pipe               = { "|" }
+    pipe_and           = { "|&" }
+    
+
+
 program             = { command_list }
 command_list        = { command ~ (CMD_DELIM+ ~ command)* }
 command             = _{ if_clause | simple_command }
 if_clause           = { "if" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "then" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "fi" }
-simple_command      = { ( builtin_command | command_name ) ~ args }
+simple_command      = { ( builtin_command | command_name ) ~ (arg ~ ( "="? ~ arg)*)?}
 command_name        = @{ ASCII_ALPHANUMERIC+ }
 
-args = @{ (!SEMICOLON ~ !NEWLINE ~ ANY)* }
+arg = {  ASSIGNMENT | QUOTE | WORD }
 
 //argument            = _{ ANY ~ (";" | NEWLINE) }
 //argument   = @{ (("-" | "--")? ~ ASCII_ALPHANUMERIC)+ }
 //quoted_argument     = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
+//redirection         = _{ trunc_right | trunc_left | appen_right | appen_left }
+//    trunc_right       = { ">"  ~ filename }
+//    trunc_left        = { "<"  ~ filename }
+//    appen_right       = { ">>" ~ filename }
+//    appen_left        = { "<<" ~ filename }
 
 builtin_command     = { 
                        colon | dot | alias | 
@@ -63,4 +98,5 @@ builtin_command     = {
     unalias            = { "unalias" }
     unset              = { "unset" }
     wait               = { "wait" }
+
 

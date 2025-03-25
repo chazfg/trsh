@@ -2,7 +2,7 @@ use pest::Parser;
 
 use crate::{
     Program, TrshError, TrshResult,
-    ast::{Command, SimpleCommand},
+    ast::{Command, SimpleCommand, ValidArg},
     builtins::{Builtin, CmdName},
     prsr::{Rule, TrshPrsr},
 };
@@ -55,7 +55,6 @@ impl Executor {
         }
     }
     pub fn exec(&mut self, cmd: Command) -> TrshResult<()> {
-        // println!("{:?}", cmd);
         match cmd {
             crate::ast::Command::Simple(simple_command) => self.exec_simple(simple_command),
             crate::ast::Command::Conditional(conditional) => todo!(),
@@ -78,7 +77,7 @@ impl Executor {
             CmdName::Function(_) => todo!(),
         }
     }
-    fn exec_builtin(&mut self, builtin: Builtin, args: Option<String>) -> TrshResult<()> {
+    fn exec_builtin(&mut self, builtin: Builtin, args: Vec<ValidArg>) -> TrshResult<()> {
         match builtin {
             Builtin::Colon => todo!(),
             Builtin::Dot => todo!(),
@@ -116,18 +115,22 @@ impl Executor {
         }
         Ok(())
     }
-    fn exec_unknown(&self, unknown: String, args: Option<String>) -> TrshResult<()> {
+    fn exec_unknown(&self, unknown: String, args: Vec<ValidArg>) -> TrshResult<()> {
         match self.lookup_command(&unknown) {
             Some(p) => {
-                let out = match args {
-                    Some(a) => std::process::Command::new(p)
-                        .args(a.split("\n"))
-                        .current_dir(&self.cwd)
-                        .status(),
-                    None => std::process::Command::new(p)
-                        .current_dir(&self.cwd)
-                        .status(),
-                };
+                let out = std::process::Command::new(p)
+                    .args(args)
+                    .current_dir(&self.cwd)
+                    .status();
+                // let out = match args {
+                //     Some(a) => std::process::Command::new(p)
+                //         .args(a.split("\n"))
+                //         .current_dir(&self.cwd)
+                //         .status(),
+                //     None => std::process::Command::new(p)
+                //         .current_dir(&self.cwd)
+                //         .status(),
+                // };
                 match out {
                     Ok(_) => (),
                     Err(e) => eprintln!("trsh: {}: exec error", e),
@@ -137,18 +140,22 @@ impl Executor {
         }
         Ok(())
     }
-    fn exec_cd(&mut self, args: Option<String>) {
-        match args {
-            Some(a) => {
-                let test_new = self.cwd.join(&a).canonicalize();
-                match test_new {
-                    Ok(o) => {
-                        self.cwd = o;
-                    }
-                    Err(e) => eprintln!("trsh: cd: {e}"),
+    fn exec_cd(&mut self, args: Vec<ValidArg>) {
+        if args.is_empty() {
+            self.cwd = self.home_dir.clone();
+        } else if args.len() == 1 {
+            let test_new = self
+                .cwd
+                .join::<&std::ffi::OsStr>(args[0].as_ref())
+                .canonicalize();
+            match test_new {
+                Ok(o) => {
+                    self.cwd = o;
                 }
+                Err(e) => eprintln!("trsh: cd: {e}"),
             }
-            None => self.cwd = self.home_dir.clone(),
+        } else {
+            eprintln!("trsh: cd: too many arguments");
         }
     }
 
@@ -177,44 +184,77 @@ impl Executor {
         None
     }
 
-    fn handle_alias(&mut self, args: Option<String>) -> TrshResult<()> {
-        match args {
-            Some(a) => {
-                let (lhs, rhs) = split_assignment(&a);
-                self.aliases.insert(lhs.to_string(), rhs.to_string());
-            }
-            None => self.aliases.iter().for_each(|(k, v)| {
+    fn handle_alias(&mut self, args: Vec<ValidArg>) -> TrshResult<()> {
+        if args.is_empty() {
+            self.aliases.iter().for_each(|(k, v)| {
                 println!("alias {k}=\"{v}\"");
-            }),
+            });
+        } else if args.len() == 1 {
+            match &args[0] {
+                ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: alias: invalid {s}"),
+                ValidArg::Assignment(s) => {
+                    let (lhs, rhs) = split_assignment(s);
+                    self.aliases.insert(lhs.to_string(), rhs.to_string());
+                }
+            }
+        } else {
+            eprintln!("trsh: alias: too many arguments");
         }
+        // match args {
+        //     Some(a) => {
+        //         let (lhs, rhs) = split_assignment(&a);
+        //         self.aliases.insert(lhs.to_string(), rhs.to_string());
+        //     }
+        //     None => self.aliases.iter().for_each(|(k, v)| {
+        //         println!("alias {k}=\"{v}\"");
+        //     }),
+        // }
         Ok(())
     }
 
-    fn handle_export(&mut self, args: Option<String>) -> TrshResult<()> {
-        match args {
-            Some(a) => {
-                let (lhs, rhs) = split_assignment(&a);
-                self.env_vars.insert(lhs.to_string(), rhs.to_string());
-            }
-            None => self.env_vars.iter().for_each(|(k, v)| {
+    fn handle_export(&mut self, args: Vec<ValidArg>) -> TrshResult<()> {
+        if args.is_empty() {
+            self.env_vars.iter().for_each(|(k, v)| {
                 println!("declare -x {k}=\"{v}\"");
-            }),
+            });
+        } else if args.len() == 1 {
+            match &args[0] {
+                ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: export: invalid {s}"),
+                ValidArg::Assignment(s) => {
+                    let (lhs, rhs) = split_assignment(s);
+                    self.env_vars.insert(lhs.to_string(), rhs.to_string());
+                }
+            }
+        } else {
+            eprintln!("trsh: export: too many arguments");
         }
         Ok(())
     }
-    fn unalias(&mut self, args: Option<String>) -> TrshResult<()> {
-        if let Some(a) = args {
-            match self.aliases.remove(&a) {
-                Some(_) => (),
-                None => eprintln!("trsh: unalias: {a}: not found"),
+    fn unalias(&mut self, args: Vec<ValidArg>) -> TrshResult<()> {
+        if args.is_empty() {
+            println!("nalias: usage: unalias [-a] name [name ...]");
+        } else {
+            for a in args {
+                match self.aliases.remove(a.as_str()) {
+                    Some(_) => (),
+                    None => eprintln!("trsh: unalias: {a}: not found"),
+                }
             }
         }
+        // if let Some(a) = args {
+        //     match self.aliases.remove(&a) {
+        //         Some(_) => (),
+        //         None => eprintln!("trsh: unalias: {a}: not found"),
+        //     }
+        // }
         Ok(())
     }
 
-    fn unset(&mut self, args: Option<String>) -> TrshResult<()> {
-        if let Some(a) = args {
-            self.env_vars.remove(&a);
+    fn unset(&mut self, args: Vec<ValidArg>) -> TrshResult<()> {
+        if !args.is_empty() {
+            for a in args {
+                self.env_vars.remove(a.as_str());
+            }
         }
         Ok(())
     }
@@ -228,6 +268,9 @@ fn is_executable(path: &Path) -> bool {
 }
 
 fn split_assignment(s: &str) -> (&str, &str) {
-    let (lhs, rhs) = s.split_once("=").unwrap();
+    let (lhs, rhs) = match s.split_once("=") {
+        Some((l, r)) => (l, r),
+        None => panic!("{s}"),
+    };
     (lhs.trim(), rhs.trim().trim_matches('"'))
 }

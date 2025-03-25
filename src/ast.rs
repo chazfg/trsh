@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
 use crate::{
     AstError, ParsedPair, TrshResult,
@@ -9,7 +9,71 @@ use crate::{
 #[derive(Debug)]
 pub struct SimpleCommand {
     pub name: CmdName,
-    pub args: Option<String>,
+    pub args: Vec<ValidArg>,
+}
+
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+pub enum ValidArg {
+    Word(String),
+    Quote(String),
+    Assignment(String),
+}
+
+impl Display for ValidArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValidArg::Word(s) | ValidArg::Quote(s) | ValidArg::Assignment(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+impl ValidArg {
+    pub fn new(a: ParsedPair) -> Self {
+        match a.as_rule() {
+            Rule::WORD => Self::Word(a.as_str().to_string()),
+            Rule::QUOTE => Self::Quote(a.as_str().to_string()),
+            Rule::ASSIGNMENT => Self::Assignment(a.as_str().to_string()),
+            Rule::arg => Self::new(a.into_inner().next().unwrap()),
+            r => panic!("{r:?}"),
+        }
+    }
+    pub fn as_str(&self) -> &str {
+        match self {
+            ValidArg::Word(s) => s,
+            ValidArg::Quote(s) => s,
+            ValidArg::Assignment(s) => s,
+        }
+    }
+}
+
+impl AsRef<String> for ValidArg {
+    fn as_ref(&self) -> &String {
+        match self {
+            ValidArg::Word(s) => s,
+            ValidArg::Quote(s) => s,
+            ValidArg::Assignment(s) => s,
+        }
+    }
+}
+
+impl std::borrow::Borrow<str> for ValidArg {
+    fn borrow(&self) -> &str {
+        match self {
+            ValidArg::Word(s) => s,
+            ValidArg::Quote(s) => s,
+            ValidArg::Assignment(s) => s,
+        }
+    }
+}
+
+impl AsRef<std::ffi::OsStr> for ValidArg {
+    fn as_ref(&self) -> &std::ffi::OsStr {
+        match self {
+            ValidArg::Word(s) => std::ffi::OsStr::new(s),
+            ValidArg::Quote(s) => std::ffi::OsStr::new(s),
+            ValidArg::Assignment(s) => std::ffi::OsStr::new(s),
+        }
+    }
 }
 
 impl SimpleCommand {
@@ -40,16 +104,17 @@ impl SimpleCommand {
         };
 
         // let rule = name_rule.as_rule();
-        let args = match parts.next().map(|s| s.as_str().trim()) {
-            Some(s) => {
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            }
-            None => None,
-        };
+        let args = parts.map(|p| ValidArg::new(p)).collect();
+        // let args = match parts.next().map(|s| s.as_str().trim()) {
+        //     Some(s) => {
+        //         if s.is_empty() {
+        //             None
+        //         } else {
+        //             Some(s.to_string())
+        //         }
+        //     }
+        //     None => None,
+        // };
         Ok(Self { name, args })
     }
 }
