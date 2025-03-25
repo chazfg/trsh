@@ -17,12 +17,55 @@ pub enum ValidArg {
     Word(String),
     Quote(String),
     Assignment(String),
+    Redirection(Redirection),
+}
+
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+pub enum Redirection {
+    AppendRight,
+    AppendLeft,
+    TruncRight,
+    TruncLeft,
+}
+
+impl std::borrow::Borrow<str> for Redirection {
+    fn borrow(&self) -> &str {
+        match self {
+            Redirection::AppendRight => ">>",
+            Redirection::AppendLeft => "<<",
+            Redirection::TruncRight => ">",
+            Redirection::TruncLeft => "<",
+        }
+    }
+}
+
+impl Redirection {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Redirection::AppendRight => ">>",
+            Redirection::AppendLeft => "<<",
+            Redirection::TruncRight => ">",
+            Redirection::TruncLeft => "<",
+        }
+    }
+}
+
+impl Display for Redirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Redirection::AppendRight => write!(f, ">>"),
+            Redirection::AppendLeft => write!(f, "<<"),
+            Redirection::TruncRight => write!(f, ">"),
+            Redirection::TruncLeft => write!(f, "<"),
+        }
+    }
 }
 
 impl Display for ValidArg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidArg::Word(s) | ValidArg::Quote(s) | ValidArg::Assignment(s) => write!(f, "{s}"),
+            ValidArg::Redirection(r) => write!(f, "{r}"),
         }
     }
 }
@@ -34,6 +77,10 @@ impl ValidArg {
             Rule::QUOTE => Self::Quote(a.as_str().to_string()),
             Rule::ASSIGNMENT => Self::Assignment(a.as_str().to_string()),
             Rule::arg => Self::new(a.into_inner().next().unwrap()),
+            Rule::TRUNC_R => Self::Redirection(Redirection::TruncRight),
+            Rule::TRUNC_L => Self::Redirection(Redirection::TruncLeft),
+            Rule::APPEN_R => Self::Redirection(Redirection::AppendRight),
+            Rule::APPEN_L => Self::Redirection(Redirection::AppendLeft),
             r => panic!("{r:?}"),
         }
     }
@@ -42,16 +89,7 @@ impl ValidArg {
             ValidArg::Word(s) => s,
             ValidArg::Quote(s) => s,
             ValidArg::Assignment(s) => s,
-        }
-    }
-}
-
-impl AsRef<String> for ValidArg {
-    fn as_ref(&self) -> &String {
-        match self {
-            ValidArg::Word(s) => s,
-            ValidArg::Quote(s) => s,
-            ValidArg::Assignment(s) => s,
+            ValidArg::Redirection(redirection) => redirection.as_str(),
         }
     }
 }
@@ -62,6 +100,7 @@ impl std::borrow::Borrow<str> for ValidArg {
             ValidArg::Word(s) => s,
             ValidArg::Quote(s) => s,
             ValidArg::Assignment(s) => s,
+            ValidArg::Redirection(redirection) => redirection.borrow(),
         }
     }
 }
@@ -72,6 +111,7 @@ impl AsRef<std::ffi::OsStr> for ValidArg {
             ValidArg::Word(s) => std::ffi::OsStr::new(s),
             ValidArg::Quote(s) => std::ffi::OsStr::new(s),
             ValidArg::Assignment(s) => std::ffi::OsStr::new(s),
+            ValidArg::Redirection(redir) => std::ffi::OsStr::new(redir.as_str()),
         }
     }
 }

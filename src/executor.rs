@@ -112,6 +112,21 @@ impl Executor {
             Builtin::Unalias => self.unalias(args)?,
             Builtin::Unset => self.unset(args)?,
             Builtin::Wait => todo!(),
+            Builtin::Bind => todo!(),
+            Builtin::Builtin => todo!(),
+            Builtin::Caller => todo!(),
+            Builtin::Declare => todo!(),
+            Builtin::Echo => todo!(),
+            Builtin::Enable => todo!(),
+            Builtin::Help => todo!(),
+            Builtin::Let => todo!(),
+            Builtin::Local => todo!(),
+            Builtin::Logout => todo!(),
+            Builtin::Mapfile => todo!(),
+            Builtin::Printf => todo!(),
+            Builtin::Readarray => todo!(),
+            Builtin::Source => todo!(),
+            Builtin::Shopt => todo!(),
         }
         Ok(())
     }
@@ -191,6 +206,7 @@ impl Executor {
             });
         } else if args.len() == 1 {
             match &args[0] {
+                ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
                 ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: alias: invalid {s}"),
                 ValidArg::Assignment(s) => {
                     let (lhs, rhs) = split_assignment(s);
@@ -219,6 +235,7 @@ impl Executor {
             });
         } else if args.len() == 1 {
             match &args[0] {
+                ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
                 ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: export: invalid {s}"),
                 ValidArg::Assignment(s) => {
                     let (lhs, rhs) = split_assignment(s);
