@@ -63,7 +63,7 @@ impl Executor {
                     // won't work with declaring functions, fine for now though
                     for line in trshrc.lines() {
                         TrshPrsr::parse(Rule::program, line)
-                            .inspect(|e| println!("{:?}", e))
+                            // .inspect(|e| println!("{:?}", e))
                             .map_err(|e| TrshError::Pest(Box::new(e)))
                             .and_then(|mut r| {
                                 Program::new(r.next().unwrap(), self.env(), &mut None)

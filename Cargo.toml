@@ -1,7 +1,15 @@
 [package]
 name = "trsh"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
+authors = ["CJ Gorey <cjgorey@pm.me>"]
+description = "Attempt to create a posix shell in rust"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/chazfg/trsh"
+homepage = "https://github.com/chazfg/trsh"
+keywords = ["shell", "POSIX", "bash", "terminal"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.5.32", features = ["cargo", "derive"] }
@@ -10,3 +18,7 @@ pest = "2.7.15"
 pest_derive = "2.7.15"
 phf = { version = "0.11.3", features = ["macros"] }
 rustyline = "15.0.0"
+
+[[bin]]
+name = "trsh"
+path = "src/main.rs"
