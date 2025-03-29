@@ -56,7 +56,7 @@ fn repl() {
         match rl.readline(&prompt) {
             Ok(readline) => {
                 TrshPrsr::parse(Rule::program, &readline)
-                    // .inspect(|e| println!("{:?}", e))
+                    .inspect(|e| println!("{:?}", e))
                     .map_err(|e| TrshError::Pest(Box::new(e)))
                     .and_then(|mut r| Program::new(r.next().unwrap(), executor.env()))
                     .and_then(|prog| executor.exec(prog.0))

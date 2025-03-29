@@ -149,15 +149,21 @@ impl Executor {
                 for d in redirs {
                     match d {
                         Redirection::AppendRight(s) => {
-                            let mut f = std::fs::OpenOptions::new()
+                            let f = std::fs::OpenOptions::new()
                                 .create(true)
                                 .append(true)
                                 .open(s)?;
                             out.stdout(Stdio::from(f));
                         }
-                        Redirection::AppendLeft => todo!(),
-                        Redirection::TruncRight(s) => todo!(),
-                        Redirection::TruncLeft => todo!(),
+                        Redirection::Input(s) => {
+                            let file = std::fs::File::open(s)?;
+                            out.stdin(Stdio::from(file));
+                        }
+                        Redirection::TruncRight(s) => {
+                            let file = std::fs::File::create(s)?;
+                            out.stdout(Stdio::from(file));
+                        }
+                        Redirection::HereDoc => todo!(),
                     }
                 }
 
@@ -226,7 +232,9 @@ impl Executor {
         } else if args.len() == 1 {
             match &args[0] {
                 // ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
-                ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: alias: invalid {s}"),
+                ValidArg::Filename(s) | ValidArg::Word(s) | ValidArg::Quote(s) => {
+                    eprintln!("trsh: alias: invalid {s}")
+                }
                 ValidArg::Assignment(s) => {
                     let (lhs, rhs) = split_assignment(s);
                     self.aliases.insert(lhs.to_string(), rhs.to_string());
@@ -235,15 +243,6 @@ impl Executor {
         } else {
             eprintln!("trsh: alias: too many arguments");
         }
-        // match args {
-        //     Some(a) => {
-        //         let (lhs, rhs) = split_assignment(&a);
-        //         self.aliases.insert(lhs.to_string(), rhs.to_string());
-        //     }
-        //     None => self.aliases.iter().for_each(|(k, v)| {
-        //         println!("alias {k}=\"{v}\"");
-        //     }),
-        // }
         Ok(())
     }
 
@@ -255,7 +254,9 @@ impl Executor {
         } else if args.len() == 1 {
             match &args[0] {
                 // ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
-                ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: export: invalid {s}"),
+                ValidArg::Filename(s) | ValidArg::Word(s) | ValidArg::Quote(s) => {
+                    eprintln!("trsh: export: invalid {s}")
+                }
                 ValidArg::Assignment(s) => {
                     let (lhs, rhs) = split_assignment(s);
                     self.env_vars.insert(lhs.to_string(), rhs.to_string());

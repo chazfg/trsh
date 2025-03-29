@@ -1,7 +1,0 @@
-Cargo.lock
-Cargo.toml
-README.md
-hist
-out.txt
-src
-target

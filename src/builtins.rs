@@ -1,11 +1,8 @@
-use std::collections::HashMap;
+use crate::prsr::Rule;
+use phf::phf_map;
 use std::path::PathBuf;
 
-use crate::ParsedPair;
-use crate::ast::Command;
-use crate::prsr::Rule;
-
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Builtin {
     Colon, // :
     Dot,   // .
@@ -97,6 +94,39 @@ impl Builtin {
         }
     }
 }
+
+pub static BUILTINS: phf::Map<&'static str, Builtin> = phf_map! {
+    "alias" => Builtin::Alias,
+    "command" => Builtin::Command,
+    "continue" => Builtin::Continue,
+    "eval" => Builtin::Eval,
+    "exit" => Builtin::Exit,
+    "export" => Builtin::Export,
+    "pwd" => Builtin::Pwd,
+    "bg" => Builtin::Bg,
+    "break" => Builtin::Break,
+    "exec" => Builtin::Exec,
+    "fc" => Builtin::Fc,
+    "fg" => Builtin::Fg,
+    "getopts" => Builtin::Getopts,
+    "hash" => Builtin::Hash,
+    "jobs" => Builtin::Jobs,
+    "kill" => Builtin::Kill,
+    "read" => Builtin::Read,
+    "readonly" => Builtin::Readonly,
+    "return" => Builtin::Return,
+    "set" => Builtin::Set,
+    "shift" => Builtin::Shift,
+    "test" => Builtin::Test,
+    "times" => Builtin::Times,
+    "trap" => Builtin::Trap,
+    "type" => Builtin::Type,
+    "ulimit" => Builtin::Ulimit,
+    "umask" => Builtin::Umask,
+    "Unalias" => Builtin::Unalias,
+    "unset" => Builtin::Unset,
+    "wait" => Builtin::Wait,
+};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum CmdName {
