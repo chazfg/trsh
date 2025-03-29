@@ -51,7 +51,7 @@ REDIRECTION         = _{   APPEN_R | HEREDOC | TRUNC_R | INPUT }
     TRUNC_R       = { ">" ~ filename }
     INPUT         = { "<" ~ filename }
     APPEN_R       = { ">>" ~ filename }
-    HEREDOC       = { "<<" }
+    HEREDOC       = { "<<" ~ WORD }
 
 builtin_command     = { 
                        colon | dot | alias | 

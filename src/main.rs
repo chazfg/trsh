@@ -51,6 +51,7 @@ fn repl() {
     history.load(h).unwrap();
     let mut rl: Editor<(), FileHistory> = Editor::with_history(config, history).unwrap();
     let mut executor = Executor::new();
+    executor.load_trshrc();
     loop {
         let prompt = format!("[trsh: {}]$ ", executor);
         match rl.readline(&prompt) {
@@ -58,7 +59,9 @@ fn repl() {
                 TrshPrsr::parse(Rule::program, &readline)
                     .inspect(|e| println!("{:?}", e))
                     .map_err(|e| TrshError::Pest(Box::new(e)))
-                    .and_then(|mut r| Program::new(r.next().unwrap(), executor.env()))
+                    .and_then(|mut r| {
+                        Program::new(r.next().unwrap(), executor.env(), &mut Some(&mut rl))
+                    })
                     .and_then(|prog| executor.exec(prog.0))
                     .map(|_| {})
                     .map_err(|e| eprintln!("{e:?}"))
@@ -74,7 +77,7 @@ fn run_once(s: &str) {
     TrshPrsr::parse(Rule::program, s)
         // .inspect(|e| println!("{:?}", e))
         .map_err(|e| TrshError::Pest(Box::new(e)))
-        .and_then(|mut r| Program::new(r.next().unwrap(), executor.env()))
+        .and_then(|mut r| Program::new(r.next().unwrap(), executor.env(), &mut None))
         .and_then(|prog| executor.exec(prog.0))
         .map(|_| {})
         .map_err(|e| eprintln!("{e:?}"))
@@ -87,9 +90,10 @@ impl Program {
     pub fn new(
         rule: ParsedPair<'_>,
         env: (&HashMap<String, String>, &HashMap<String, String>),
+        rl: &mut Option<&mut Editor<(), FileHistory>>,
     ) -> TrshResult<Self> {
         let mut rules = rule.into_inner();
-        Ok(Self(Command::new(rules.next().unwrap(), env)?))
+        Ok(Self(Command::new(rules.next().unwrap(), env, rl)?))
     }
 }
 

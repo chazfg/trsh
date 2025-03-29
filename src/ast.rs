@@ -1,5 +1,7 @@
 use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
+use rustyline::{Editor, history::FileHistory};
+
 use crate::{
     AstError, ParsedPair, TrshResult,
     builtins::{BUILTINS, CmdName},
@@ -26,7 +28,7 @@ pub enum Redirection {
     AppendRight(String),
     Input(String),
     TruncRight(String),
-    HereDoc,
+    HereDoc(String),
 }
 
 impl Redirection {
@@ -35,7 +37,27 @@ impl Redirection {
             Redirection::AppendRight(s) => format!(">> {s}"),
             Redirection::Input(s) => format!("< {s}"),
             Redirection::TruncRight(s) => format!("> {s}"),
-            Redirection::HereDoc => "<<".to_owned(),
+            Redirection::HereDoc(s) => format!("<<{s}"),
+        }
+    }
+    pub fn load_heredoc(delim: String, rl: &mut Option<&mut Editor<(), FileHistory>>) -> Self {
+        if let Some(r) = rl {
+            let mut input_str = String::new();
+            loop {
+                match r.readline("> ") {
+                    Ok(s) => {
+                        if s != delim {
+                            input_str.push_str(&s);
+                            input_str.push('\n');
+                        } else {
+                            break Self::HereDoc(input_str);
+                        }
+                    }
+                    Err(e) => eprintln!("trsh: heredoc err: {e}"),
+                }
+            }
+        } else {
+            panic!("didn't get the prompt")
         }
     }
 }
@@ -46,7 +68,7 @@ impl Display for Redirection {
             Redirection::AppendRight(s) => write!(f, ">> {s}"),
             Redirection::Input(s) => write!(f, "< {s}"),
             Redirection::TruncRight(s) => write!(f, "> {s}"),
-            Redirection::HereDoc => write!(f, "<"),
+            Redirection::HereDoc(s) => write!(f, "<<{s}"),
         }
     }
 }
@@ -109,12 +131,13 @@ impl SimpleCommand {
     pub fn new(
         rule: ParsedPair<'_>,
         env: (&HashMap<String, String>, &HashMap<String, String>),
+        rl: &mut Option<&mut Editor<(), FileHistory>>,
     ) -> TrshResult<Self> {
         let mut parts = rule.into_inner();
 
         let parts_cmd = parts.next().unwrap();
         let parts_name = parts_cmd.as_str().trim();
-        println!("{parts_name}");
+        // println!("{parts_name}");
         let name = if parts_name.contains("/") {
             CmdName::Path(PathBuf::from(parts_name))
         } else if let Some(cmd) = env.0.get(parts_name) {
@@ -142,7 +165,10 @@ impl SimpleCommand {
                 Rule::TRUNC_R => redirections.push(Redirection::TruncRight(
                     p.into_inner().next().unwrap().as_str().to_owned(),
                 )),
-                Rule::HEREDOC => redirections.push(Redirection::HereDoc),
+                Rule::HEREDOC => redirections.push(Redirection::load_heredoc(
+                    p.into_inner().next().unwrap().as_str().to_owned(),
+                    rl,
+                )),
                 r => todo!("{r:?}"),
             }
         }
@@ -164,21 +190,24 @@ pub struct Conditional {
 impl Conditional {
     fn new(
         rule: ParsedPair<'_>,
-
         env: (&HashMap<String, String>, &HashMap<String, String>),
+        rl: &mut Option<&mut Editor<(), FileHistory>>,
     ) -> TrshResult<Self> {
         let mut parts = rule.into_inner();
         let condition = Box::new(Command::new(
             parts.next().ok_or(AstError::IncompleteConditional)?,
             env,
+            rl,
         )?);
         let then_branch = Box::new(Command::new(
             parts.next().ok_or(AstError::IncompleteConditional)?,
             env,
+            rl,
         )?);
         let else_branch = Box::new(Command::new(
             parts.next().ok_or(AstError::IncompleteConditional)?,
             env,
+            rl,
         )?);
         Ok(Self {
             condition,
@@ -198,18 +227,19 @@ impl Command {
     pub fn new(
         rule: ParsedPair<'_>,
         env: (&HashMap<String, String>, &HashMap<String, String>),
+        rl: &mut Option<&mut Editor<(), FileHistory>>,
     ) -> TrshResult<Self> {
         Ok(match rule.as_rule() {
             Rule::program => todo!(),
             Rule::command_list => {
                 let mut v = Vec::new();
                 for r in rule.into_inner() {
-                    v.push(Self::new(r, env)?);
+                    v.push(Self::new(r, env, rl)?);
                 }
                 Self::Sequence(v)
             }
-            Rule::if_clause => Self::Conditional(Conditional::new(rule, env)?),
-            Rule::simple_command => Self::Simple(SimpleCommand::new(rule, env)?),
+            Rule::if_clause => Self::Conditional(Conditional::new(rule, env, rl)?),
+            Rule::simple_command => Self::Simple(SimpleCommand::new(rule, env, rl)?),
             Rule::WHITESPACE => todo!(),
             Rule::NEWLINE => todo!(),
             Rule::command => todo!(),

@@ -1,19 +1,21 @@
 # trsh Development Roadmap
 
+For most of these, take them as a _very_ loose interpretation of "Complete"
+
 ## Phase 1: Core (done or nearly done)
 
 - [x] REPL w/ prompt
 - [x] Command parsing
 - [x] Builtin detection
 - [x] Builtins: `cd`, `pwd`, `alias`, `unalias`, `export`, `unset`, `exit`
-- [ ] `.trshrc` support
+- [x] SIMPLE `.trshrc` support
 - [x] `-c` / `[script_file]`
 
 ## Phase 2: (Simple) Execution Semantics
 
 - [x] Append (Redirection): >>
 - [x] Truncate (Redirection): >
-- [ ] HereDoc (Redirection): <<
+- [x] HereDoc (Redirection): <<
 - [x] Input (Redirection): <
 - [ ] Pipes
 - [ ] Command Sequencing

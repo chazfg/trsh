@@ -55,6 +55,29 @@ impl Executor {
             std_out,
         }
     }
+    pub fn load_trshrc(&mut self) {
+        let possible_trsh = self.home_dir.join(".trshrc");
+        if possible_trsh.exists() {
+            match std::fs::read_to_string(possible_trsh) {
+                Ok(trshrc) => {
+                    // won't work with declaring functions, fine for now though
+                    for line in trshrc.lines() {
+                        TrshPrsr::parse(Rule::program, line)
+                            .inspect(|e| println!("{:?}", e))
+                            .map_err(|e| TrshError::Pest(Box::new(e)))
+                            .and_then(|mut r| {
+                                Program::new(r.next().unwrap(), self.env(), &mut None)
+                            })
+                            .and_then(|prog| self.exec(prog.0))
+                            .map(|_| {})
+                            .map_err(|e| eprintln!("{e:?}"))
+                            .ok();
+                    }
+                }
+                Err(e) => eprintln!("trsh: error parsing .trshrc: {e}"),
+            }
+        }
+    }
     pub fn exec(&mut self, cmd: Command) -> TrshResult<()> {
         match cmd {
             crate::ast::Command::Simple(simple_command) => self.exec_simple(simple_command),
@@ -77,7 +100,7 @@ impl Executor {
             CmdName::Path(path_buf) => todo!(),
             CmdName::Alias(a) => TrshPrsr::parse(Rule::program, &a)
                 .map_err(|e| TrshError::Pest(Box::new(e)))
-                .and_then(|mut r| Program::new(r.next().unwrap(), self.env()))
+                .and_then(|mut r| Program::new(r.next().unwrap(), self.env(), &mut None))
                 .and_then(|prog| self.exec(prog.0)),
             CmdName::Function(_) => todo!(),
         }
@@ -143,9 +166,9 @@ impl Executor {
     ) -> TrshResult<()> {
         match self.lookup_command(&unknown) {
             Some(p) => {
-                let mut out = std::process::Command::new(p);
-                out.args(args);
-                out.current_dir(&self.cwd);
+                let mut process = std::process::Command::new(p);
+                process.args(args);
+                process.current_dir(&self.cwd);
                 for d in redirs {
                     match d {
                         Redirection::AppendRight(s) => {
@@ -153,25 +176,27 @@ impl Executor {
                                 .create(true)
                                 .append(true)
                                 .open(s)?;
-                            out.stdout(Stdio::from(f));
+                            process.stdout(Stdio::from(f));
                         }
                         Redirection::Input(s) => {
                             let file = std::fs::File::open(s)?;
-                            out.stdin(Stdio::from(file));
+                            process.stdin(Stdio::from(file));
                         }
                         Redirection::TruncRight(s) => {
                             let file = std::fs::File::create(s)?;
-                            out.stdout(Stdio::from(file));
+                            process.stdout(Stdio::from(file));
                         }
-                        Redirection::HereDoc => todo!(),
+                        Redirection::HereDoc(s) => {
+                            let mut child_proc = process.stdin(Stdio::piped()).spawn()?;
+                            if let Some(mut stdin) = child_proc.stdin.take() {
+                                stdin.write_all(s.as_bytes())?;
+                            }
+                            child_proc.wait()?;
+                        }
                     }
                 }
 
-                // .args(args)
-                // .current_dir(&self.cwd)
-                // .status();
-
-                match out.status() {
+                match process.status() {
                     Ok(_) => (),
                     Err(e) => eprintln!("trsh: {}: exec error", e),
                 }
