@@ -37,19 +37,20 @@ program             = { command_list }
 command_list        = { command ~ (CMD_DELIM+ ~ command)* }
 command             = _{ if_clause | simple_command }
 if_clause           = { "if" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "then" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "fi" }
-simple_command      = { ( builtin_command | command_name ) ~ (arg ~ ( "="? ~ arg)*)?}
+simple_command      = { ( builtin_command | command_name ) ~ (command_element ~ ( "="? ~ command_element)*)?}
 command_name        = @{ ASCII_ALPHANUMERIC+ }
 
-arg = { ASSIGNMENT | QUOTE | WORD | REDIRECTION }
+command_element = _{REDIRECTION | arg}
+arg = { ASSIGNMENT | QUOTE | WORD }
 
 //argument            = _{ ANY ~ (";" | NEWLINE) }
 //argument   = @{ (("-" | "--")? ~ ASCII_ALPHANUMERIC)+ }
 //quoted_argument     = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
-
-REDIRECTION         = _{ TRUNC_R | TRUNC_L | APPEN_R | APPEN_L }
-    TRUNC_R       = { ">"  }
+filename = @{!METACHAR ~ ANY+}
+REDIRECTION         = _{   APPEN_R | APPEN_L | TRUNC_R | TRUNC_L }
+    TRUNC_R       = { ">" ~ filename }
     TRUNC_L       = { "<"  }
-    APPEN_R       = { ">>" }
+    APPEN_R       = { ">>" ~ filename }
     APPEN_L       = { "<<" }
 
 builtin_command     = { 

@@ -100,6 +100,12 @@ enum TrshError {
     Pest(Box<pest::error::Error<prsr::Rule>>),
 }
 
+impl From<std::io::Error> for TrshError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Exec(ExecError::IO(Box::new(value)))
+    }
+}
+
 impl From<ExecError> for TrshError {
     fn from(value: ExecError) -> Self {
         Self::Exec(value)
@@ -119,6 +125,7 @@ enum AstError {
 enum ExecError {
     Failed,
     UnknownCmd,
+    IO(Box<std::io::Error>),
 }
 
 #[derive(clap::Parser, Debug)]

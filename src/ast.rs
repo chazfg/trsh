@@ -10,6 +10,7 @@ use crate::{
 pub struct SimpleCommand {
     pub name: CmdName,
     pub args: Vec<ValidArg>,
+    pub redirections: Vec<Redirection>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
@@ -17,35 +18,34 @@ pub enum ValidArg {
     Word(String),
     Quote(String),
     Assignment(String),
-    Redirection(Redirection),
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Redirection {
-    AppendRight,
+    AppendRight(String),
     AppendLeft,
-    TruncRight,
+    TruncRight(String),
     TruncLeft,
 }
 
-impl std::borrow::Borrow<str> for Redirection {
-    fn borrow(&self) -> &str {
-        match self {
-            Redirection::AppendRight => ">>",
-            Redirection::AppendLeft => "<<",
-            Redirection::TruncRight => ">",
-            Redirection::TruncLeft => "<",
-        }
-    }
-}
+// impl std::borrow::Borrow<str> for Redirection {
+//     fn borrow(&self) -> &str {
+//         match self {
+//             Redirection::AppendRight(s) => ">>"
+//             Redirection::AppendLeft => "<<",
+//             Redirection::TruncRight(s) => ">",
+//             Redirection::TruncLeft => "<",
+//         }
+//     }
+// }
 
 impl Redirection {
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> String {
         match self {
-            Redirection::AppendRight => ">>",
-            Redirection::AppendLeft => "<<",
-            Redirection::TruncRight => ">",
-            Redirection::TruncLeft => "<",
+            Redirection::AppendRight(s) => format!(">> {s}"),
+            Redirection::AppendLeft => "<<".to_owned(),
+            Redirection::TruncRight(s) => format!("> {s}"),
+            Redirection::TruncLeft => "<".to_owned(),
         }
     }
 }
@@ -53,9 +53,9 @@ impl Redirection {
 impl Display for Redirection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Redirection::AppendRight => write!(f, ">>"),
+            Redirection::AppendRight(s) => write!(f, ">> {s}"),
             Redirection::AppendLeft => write!(f, "<<"),
-            Redirection::TruncRight => write!(f, ">"),
+            Redirection::TruncRight(s) => write!(f, "> {s}"),
             Redirection::TruncLeft => write!(f, "<"),
         }
     }
@@ -65,7 +65,6 @@ impl Display for ValidArg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidArg::Word(s) | ValidArg::Quote(s) | ValidArg::Assignment(s) => write!(f, "{s}"),
-            ValidArg::Redirection(r) => write!(f, "{r}"),
         }
     }
 }
@@ -77,10 +76,6 @@ impl ValidArg {
             Rule::QUOTE => Self::Quote(a.as_str().to_string()),
             Rule::ASSIGNMENT => Self::Assignment(a.as_str().to_string()),
             Rule::arg => Self::new(a.into_inner().next().unwrap()),
-            Rule::TRUNC_R => Self::Redirection(Redirection::TruncRight),
-            Rule::TRUNC_L => Self::Redirection(Redirection::TruncLeft),
-            Rule::APPEN_R => Self::Redirection(Redirection::AppendRight),
-            Rule::APPEN_L => Self::Redirection(Redirection::AppendLeft),
             r => panic!("{r:?}"),
         }
     }
@@ -89,7 +84,6 @@ impl ValidArg {
             ValidArg::Word(s) => s,
             ValidArg::Quote(s) => s,
             ValidArg::Assignment(s) => s,
-            ValidArg::Redirection(redirection) => redirection.as_str(),
         }
     }
 }
@@ -100,7 +94,6 @@ impl std::borrow::Borrow<str> for ValidArg {
             ValidArg::Word(s) => s,
             ValidArg::Quote(s) => s,
             ValidArg::Assignment(s) => s,
-            ValidArg::Redirection(redirection) => redirection.borrow(),
         }
     }
 }
@@ -111,7 +104,6 @@ impl AsRef<std::ffi::OsStr> for ValidArg {
             ValidArg::Word(s) => std::ffi::OsStr::new(s),
             ValidArg::Quote(s) => std::ffi::OsStr::new(s),
             ValidArg::Assignment(s) => std::ffi::OsStr::new(s),
-            ValidArg::Redirection(redir) => std::ffi::OsStr::new(redir.as_str()),
         }
     }
 }
@@ -144,7 +136,23 @@ impl SimpleCommand {
         };
 
         // let rule = name_rule.as_rule();
-        let args = parts.map(|p| ValidArg::new(p)).collect();
+        let mut redirections = Vec::new();
+        let mut args = Vec::new();
+        for p in parts {
+            match p.as_rule() {
+                Rule::arg => args.push(ValidArg::new(p)),
+                Rule::APPEN_R => redirections.push(Redirection::AppendRight(
+                    p.into_inner().next().unwrap().as_str().to_owned(),
+                )),
+                Rule::APPEN_L => redirections.push(Redirection::AppendLeft),
+                Rule::TRUNC_R => redirections.push(Redirection::TruncRight(
+                    p.into_inner().next().unwrap().as_str().to_owned(),
+                )),
+                Rule::TRUNC_L => redirections.push(Redirection::TruncLeft),
+                r => todo!("{r:?}"),
+            }
+        }
+        // let args = parts.map(|p| ValidArg::new(p)).collect();
         // let args = match parts.next().map(|s| s.as_str().trim()) {
         //     Some(s) => {
         //         if s.is_empty() {
@@ -155,7 +163,11 @@ impl SimpleCommand {
         //     }
         //     None => None,
         // };
-        Ok(Self { name, args })
+        Ok(Self {
+            name,
+            args,
+            redirections,
+        })
     }
 }
 

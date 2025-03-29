@@ -2,7 +2,7 @@ use pest::Parser;
 
 use crate::{
     Program, TrshError, TrshResult,
-    ast::{Command, SimpleCommand, ValidArg},
+    ast::{Command, Redirection, SimpleCommand, ValidArg},
     builtins::{Builtin, CmdName},
     prsr::{Rule, TrshPrsr},
 };
@@ -11,6 +11,7 @@ use std::{
     fmt::Display,
     io::{self, Stdout, Write},
     path::{Path, PathBuf},
+    process::Stdio,
 };
 
 pub struct Executor {
@@ -65,10 +66,14 @@ impl Executor {
     }
 
     fn exec_simple(&mut self, simple_command: SimpleCommand) -> TrshResult<()> {
-        let SimpleCommand { name, args } = simple_command;
+        let SimpleCommand {
+            name,
+            args,
+            redirections,
+        } = simple_command;
         match name {
             CmdName::Builtin(builtin) => self.exec_builtin(builtin, args),
-            CmdName::Unknown(unknown_cmd) => self.exec_unknown(unknown_cmd, args),
+            CmdName::Unknown(unknown_cmd) => self.exec_unknown(unknown_cmd, args, redirections),
             CmdName::Path(path_buf) => todo!(),
             CmdName::Alias(a) => TrshPrsr::parse(Rule::program, &a)
                 .map_err(|e| TrshError::Pest(Box::new(e)))
@@ -130,23 +135,37 @@ impl Executor {
         }
         Ok(())
     }
-    fn exec_unknown(&self, unknown: String, args: Vec<ValidArg>) -> TrshResult<()> {
+    fn exec_unknown(
+        &self,
+        unknown: String,
+        args: Vec<ValidArg>,
+        redirs: Vec<Redirection>,
+    ) -> TrshResult<()> {
         match self.lookup_command(&unknown) {
             Some(p) => {
-                let out = std::process::Command::new(p)
-                    .args(args)
-                    .current_dir(&self.cwd)
-                    .status();
-                // let out = match args {
-                //     Some(a) => std::process::Command::new(p)
-                //         .args(a.split("\n"))
-                //         .current_dir(&self.cwd)
-                //         .status(),
-                //     None => std::process::Command::new(p)
-                //         .current_dir(&self.cwd)
-                //         .status(),
-                // };
-                match out {
+                let mut out = std::process::Command::new(p);
+                out.args(args);
+                out.current_dir(&self.cwd);
+                for d in redirs {
+                    match d {
+                        Redirection::AppendRight(s) => {
+                            let mut f = std::fs::OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open(s)?;
+                            out.stdout(Stdio::from(f));
+                        }
+                        Redirection::AppendLeft => todo!(),
+                        Redirection::TruncRight(s) => todo!(),
+                        Redirection::TruncLeft => todo!(),
+                    }
+                }
+
+                // .args(args)
+                // .current_dir(&self.cwd)
+                // .status();
+
+                match out.status() {
                     Ok(_) => (),
                     Err(e) => eprintln!("trsh: {}: exec error", e),
                 }
@@ -206,7 +225,7 @@ impl Executor {
             });
         } else if args.len() == 1 {
             match &args[0] {
-                ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
+                // ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
                 ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: alias: invalid {s}"),
                 ValidArg::Assignment(s) => {
                     let (lhs, rhs) = split_assignment(s);
@@ -235,7 +254,7 @@ impl Executor {
             });
         } else if args.len() == 1 {
             match &args[0] {
-                ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
+                // ValidArg::Redirection(s) => eprintln!("trsh: alias: invalid {s}"),
                 ValidArg::Word(s) | ValidArg::Quote(s) => eprintln!("trsh: export: invalid {s}"),
                 ValidArg::Assignment(s) => {
                     let (lhs, rhs) = split_assignment(s);
