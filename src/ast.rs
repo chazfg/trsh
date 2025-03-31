@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::{collections::HashMap, ffi::OsString, fmt::Display, path::PathBuf};
 
 use rustyline::{Editor, history::FileHistory};
 
@@ -11,16 +11,16 @@ use crate::{
 #[derive(Debug)]
 pub struct SimpleCommand {
     pub name: CmdName,
-    pub args: Vec<ValidArg>,
+    pub args: Vec<CmdArg>,
     pub redirections: Vec<Redirection>,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-pub enum ValidArg {
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Clone)]
+pub enum Token {
     Word(String),
     Quote(String),
-    Assignment(String),
-    Filename(String),
+    Eq,
+    Neq,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
@@ -32,14 +32,6 @@ pub enum Redirection {
 }
 
 impl Redirection {
-    pub fn as_str(&self) -> String {
-        match self {
-            Redirection::AppendRight(s) => format!(">> {s}"),
-            Redirection::Input(s) => format!("< {s}"),
-            Redirection::TruncRight(s) => format!("> {s}"),
-            Redirection::HereDoc(s) => format!("<<{s}"),
-        }
-    }
     pub fn load_heredoc(delim: String, rl: &mut Option<&mut Editor<(), FileHistory>>) -> Self {
         if let Some(r) = rl {
             let mut input_str = String::new();
@@ -73,56 +65,58 @@ impl Display for Redirection {
     }
 }
 
-impl Display for ValidArg {
+impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValidArg::Filename(s)
-            | ValidArg::Word(s)
-            | ValidArg::Quote(s)
-            | ValidArg::Assignment(s) => write!(f, "{s}"),
+            Token::Eq => write!(f, "="),
+            Token::Neq => write!(f, "!="),
+            Token::Word(s) | Token::Quote(s) => write!(f, "{s}"),
         }
     }
 }
 
-impl ValidArg {
+impl Token {
     pub fn new(a: ParsedPair) -> Self {
         match a.as_rule() {
             Rule::WORD => Self::Word(a.as_str().to_string()),
-            Rule::QUOTE => Self::Quote(a.as_str().to_string()),
-            Rule::ASSIGNMENT => Self::Assignment(a.as_str().to_string()),
-            Rule::filename => Self::Filename(a.as_str().to_string()),
+            Rule::QUOTE => Self::Quote(a.as_str().trim_matches('"').to_string()),
+            Rule::EQ => Self::Eq,
+            Rule::NEQ => Self::Neq,
+            // Rule::ASSIGNMENT => Self::Assignment(a.as_str().to_string()),
+            // Rule::filename => Self::Filename(a.as_str().to_string()),
             Rule::arg => Self::new(a.into_inner().next().unwrap()),
             r => panic!("{r:?}"),
         }
     }
     pub fn as_str(&self) -> &str {
         match self {
-            ValidArg::Word(s) => s,
-            ValidArg::Quote(s) => s,
-            ValidArg::Assignment(s) => s,
-            ValidArg::Filename(s) => s,
+            Token::Word(s) => s,
+            Token::Quote(s) => s,
+            Token::Eq => "=",
+            Token::Neq => "!=",
         }
     }
 }
 
-impl std::borrow::Borrow<str> for ValidArg {
+impl std::borrow::Borrow<str> for Token {
     fn borrow(&self) -> &str {
         match self {
-            ValidArg::Word(s) => s,
-            ValidArg::Quote(s) => s,
-            ValidArg::Assignment(s) => s,
-            ValidArg::Filename(s) => s,
+            Token::Word(s) => s,
+            Token::Quote(s) => s,
+            Token::Eq => "=",
+            Token::Neq => "!=",
         }
     }
 }
 
-impl AsRef<std::ffi::OsStr> for ValidArg {
+impl AsRef<std::ffi::OsStr> for Token {
     fn as_ref(&self) -> &std::ffi::OsStr {
         match self {
-            ValidArg::Word(s) => std::ffi::OsStr::new(s),
-            ValidArg::Quote(s) => std::ffi::OsStr::new(s),
-            ValidArg::Assignment(s) => std::ffi::OsStr::new(s),
-            ValidArg::Filename(s) => std::ffi::OsStr::new(s),
+            Token::Word(s) => std::ffi::OsStr::new(s),
+            Token::Quote(s) => std::ffi::OsStr::new(s),
+            Token::Eq => std::ffi::OsStr::new("="),
+            Token::Neq => std::ffi::OsStr::new("!="),
+            // ValidArg::Assignment(left, right) => std::ffi::OsStr::new(&format!("{left}={right}")),
         }
     }
 }
@@ -152,10 +146,10 @@ impl SimpleCommand {
         };
 
         let mut redirections = Vec::new();
-        let mut args = Vec::new();
+        let mut tokens = Vec::new();
         for p in parts {
             match p.as_rule() {
-                Rule::arg => args.push(ValidArg::new(p)),
+                Rule::arg => tokens.push(Token::new(p)),
                 Rule::APPEN_R => redirections.push(Redirection::AppendRight(
                     p.into_inner().next().unwrap().as_str().to_owned(),
                 )),
@@ -172,6 +166,33 @@ impl SimpleCommand {
                 r => todo!("{r:?}"),
             }
         }
+        let mut args: Vec<CmdArg> = Vec::new();
+        // let mut assigns = Vec::new();
+        let mut i = 0;
+        while i < tokens.len() {
+            match &tokens[i..] {
+                [Token::Word(key), Token::Eq, Token::Quote(val)]
+                | [Token::Word(key), Token::Eq, Token::Word(val)] => {
+                    args.push(CmdArg::Assignment(key.clone(), val.clone()));
+                    i += 3;
+                }
+                [Token::Word(word)] => {
+                    args.push(CmdArg::Arg(word.clone()));
+                    i += 1;
+                }
+                [Token::Quote(quote)] => {
+                    args.push(CmdArg::Quoted(quote.clone()));
+                    i += 1;
+                }
+                _ => break,
+            }
+        }
+        tokens.drain(i..).for_each(|t| match t {
+            Token::Word(s) => args.push(CmdArg::Arg(s)),
+            Token::Quote(q) => args.push(CmdArg::Quoted(q)),
+            Token::Eq => args.push(CmdArg::OpEq),
+            Token::Neq => args.push(CmdArg::OpNeq),
+        });
         Ok(Self {
             name,
             args,
@@ -181,10 +202,70 @@ impl SimpleCommand {
 }
 
 #[derive(Debug)]
+pub enum CmdArg {
+    /// Regular positional argument like `ls`, `-l`, or `file.txt`
+    Arg(String),
+
+    /// A variable assignment like `FOO=bar`
+    Assignment(String, String),
+
+    /// A quoted argument like `"foo bar"` (preserves space, no expansion yet)
+    Quoted(String),
+
+    /// Logical operators used in `test` or `[` expressions
+    OpEq,
+    OpNeq,
+
+    /// (Optional/future) Variable expansion like `$FOO`
+    Variable(String),
+
+    /// (Optional/future) Command substitution like `$(ls)`
+    CommandSub(String),
+}
+impl CmdArg {
+    pub fn as_str(&self) -> &str {
+        match self {
+            CmdArg::Arg(s) => s,
+            CmdArg::Assignment(_, _) => todo!(),
+            CmdArg::Quoted(_) => todo!(),
+            CmdArg::OpEq => todo!(),
+            CmdArg::OpNeq => todo!(),
+            CmdArg::Variable(_) => todo!(),
+            CmdArg::CommandSub(_) => todo!(),
+        }
+    }
+    pub fn as_os_string(&self) -> OsString {
+        match self {
+            CmdArg::Arg(s) => std::ffi::OsString::from(s.to_string()),
+            CmdArg::Assignment(l, r) => std::ffi::OsString::from(format!("{l}=\"{r}\"")),
+            CmdArg::Quoted(q) => std::ffi::OsString::from(format!("\"{q}\"")),
+            CmdArg::OpEq => std::ffi::OsString::from("="),
+            CmdArg::OpNeq => std::ffi::OsString::from("!="),
+            CmdArg::Variable(v) => std::ffi::OsString::from(v.to_string()),
+            CmdArg::CommandSub(c) => std::ffi::OsString::from(c.to_string()),
+        }
+    }
+}
+
+impl Display for CmdArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CmdArg::Arg(s) => write!(f, "{s}"),
+            CmdArg::Assignment(l, r) => write!(f, "{l}=\"{r}\""),
+            CmdArg::Quoted(q) => write!(f, "\"{q}\""),
+            CmdArg::OpEq => write!(f, "="),
+            CmdArg::OpNeq => write!(f, "!="),
+            CmdArg::Variable(v) => write!(f, "{v}"),
+            CmdArg::CommandSub(c) => write!(f, "{c}"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Conditional {
-    condition: Box<Command>,
-    then_branch: Box<Command>,
-    else_branch: Box<Command>,
+    pub condition: Box<Command>,
+    pub then_branch: Box<Command>,
+    pub else_branch: Option<Box<Command>>,
 }
 
 impl Conditional {
@@ -204,11 +285,19 @@ impl Conditional {
             env,
             rl,
         )?);
-        let else_branch = Box::new(Command::new(
-            parts.next().ok_or(AstError::IncompleteConditional)?,
-            env,
-            rl,
-        )?);
+        let else_branch = parts
+            .next()
+            .map(|p| Box::new(Command::new(p, env, rl).unwrap()));
+        // Box::new(Command::new(
+        //     parts.next().ok_or(AstError::IncompleteConditional)?,
+        //     env,
+        //     rl,
+        // )?);
+        // let else_branch = Box::new(Command::new(
+        //     parts.next().ok_or(AstError::IncompleteConditional)?,
+        //     env,
+        //     rl,
+        // )?);
         Ok(Self {
             condition,
             then_branch,
@@ -222,6 +311,9 @@ pub enum Command {
     Simple(SimpleCommand),
     Conditional(Conditional),
     Sequence(Vec<Self>),
+    Pipeline(Box<Self>, Box<Self>),
+    And(Box<Self>, Box<Self>),
+    Or(Box<Self>, Box<Self>),
 }
 impl Command {
     pub fn new(
@@ -244,7 +336,42 @@ impl Command {
             Rule::NEWLINE => todo!(),
             Rule::command => todo!(),
             Rule::command_name => todo!(),
+            Rule::pipeline => {
+                let mut segments = rule.into_inner().map(|r| Command::new(r, env, rl));
+                let first = segments.next().unwrap()?;
+                segments.try_fold(first, |left, right_res| -> TrshResult<Self> {
+                    let right = right_res?;
+                    Ok(Command::Pipeline(Box::new(left), Box::new(right)))
+                })?
+                // todo!()
+            }
+            Rule::and_or => {
+                // println!("{rule:?}");
+                let mut iter = rule.into_inner();
+                let mut left = Command::new(iter.next().unwrap(), env, rl)?;
+
+                while let Some(op) = iter.next() {
+                    let right = Command::new(iter.next().unwrap(), env, rl)?;
+                    left = match op.as_str() {
+                        "&&" => Command::And(Box::new(left), Box::new(right)),
+                        "||" => Command::Or(Box::new(left), Box::new(right)),
+                        _ => unreachable!(),
+                    };
+                }
+                left
+            }
+            // Rule::pipe_segment => Self::new(rule.into_inner().next().unwrap(), env, rl)?,
             l => todo!("{:?}", l),
         })
     }
 }
+// fn parse_pipeline(pair: Pair<Rule>) -> AstResult<Command> {
+//     let mut segments = pair.into_inner().map(Command::new);
+//
+//     let first = segments.next().unwrap()?; // always exists (leftmost command)
+//
+//     segments.try_fold(first, |left, right_res| {
+//         let right = right_res?;
+//         Ok(Command::Pipeline(Box::new(left), Box::new(right)))
+//     })
+// }

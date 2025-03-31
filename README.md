@@ -11,7 +11,9 @@ pipelines
 
 # trsh Development Roadmap
 
-For most of these, take them as a _very_ loose interpretation of "Complete"
+For most of these, take them as a _very_ loose interpretation of "Complete". Until I start digging into
+phase 5 I don't think I'll worry much about complete end to end testing. So it's mostly just
+"This works for a few of the commands I tried with it"
 
 ## Phase 1: Core (done or nearly done)
 
@@ -20,7 +22,7 @@ For most of these, take them as a _very_ loose interpretation of "Complete"
 - [x] Builtin detection
 - [x] Builtins: `cd`, `pwd`, `alias`, `unalias`, `export`, `unset`, `exit`
 - [x] SIMPLE `.trshrc` support
-- [x] `-c` / `[script_file]`
+- [x] `-c [script_file]`
 
 ## Phase 2: (Simple) Execution Semantics
 
@@ -28,8 +30,8 @@ For most of these, take them as a _very_ loose interpretation of "Complete"
 - [x] Truncate (Redirection): >
 - [x] HereDoc (Redirection): <<
 - [x] Input (Redirection): <
-- [ ] Pipes
-- [ ] Command Sequencing
+- [x] Pipes
+- [x] Command Sequencing
 
 ## Phase 3: Additional Shell Language
 

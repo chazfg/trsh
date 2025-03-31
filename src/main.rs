@@ -3,18 +3,19 @@ use clap::Parser as ClapParser;
 mod builtins;
 mod executor;
 mod prsr;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
-
 use ast::Command;
+use colored::Colorize;
 use executor::Executor;
 use pest::{Parser, iterators::Pair};
 use prsr::{Rule, TrshPrsr};
 use rustyline::{
     Config, Editor,
     history::{DefaultHistory, FileHistory, History},
+};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    path::{Path, PathBuf},
 };
 type ParsedIterResult<'a> =
     std::result::Result<pest::iterators::Pairs<'a, prsr::Rule>, pest::error::Error<prsr::Rule>>;
@@ -53,18 +54,18 @@ fn repl() {
     let mut executor = Executor::new();
     executor.load_trshrc();
     loop {
-        let prompt = format!("[trsh: {}]$ ", executor);
+        let prompt = format!("{}{}{} ", "[trsh: ".cyan(), executor, "]$".cyan());
         match rl.readline(&prompt) {
             Ok(readline) => {
                 TrshPrsr::parse(Rule::program, &readline)
-                    // .inspect(|e| println!("{:?}", e))
+                    .inspect(|e| println!("{:?}", e))
                     .map_err(|e| TrshError::Pest(Box::new(e)))
                     .and_then(|mut r| {
                         Program::new(r.next().unwrap(), executor.env(), &mut Some(&mut rl))
                     })
-                    .and_then(|prog| executor.exec(prog.0))
+                    .and_then(|prog| executor.exec(prog.0, None, None))
                     .map(|_| {})
-                    .map_err(|e| eprintln!("{e:?}"))
+                    .map_err(|e| eprintln!("trsh: full bubble {e:?}"))
                     .ok();
             }
             Err(readerr) => panic!("{readerr}"),
@@ -78,7 +79,7 @@ fn run_once(s: &str) {
         // .inspect(|e| println!("{:?}", e))
         .map_err(|e| TrshError::Pest(Box::new(e)))
         .and_then(|mut r| Program::new(r.next().unwrap(), executor.env(), &mut None))
-        .and_then(|prog| executor.exec(prog.0))
+        .and_then(|prog| executor.exec(prog.0, None, None))
         .map(|_| {})
         .map_err(|e| eprintln!("{e:?}"))
         .ok();
@@ -102,6 +103,12 @@ enum TrshError {
     Ast(AstError),
     Exec(ExecError),
     Pest(Box<pest::error::Error<prsr::Rule>>),
+}
+
+impl TrshError {
+    pub fn gen_exec(name: &str, expl: &str) -> Self {
+        Self::Exec(ExecError::new(name, expl))
+    }
 }
 
 impl From<std::io::Error> for TrshError {
@@ -129,7 +136,30 @@ enum AstError {
 enum ExecError {
     Failed,
     UnknownCmd,
+    General(Box<Expl>),
     IO(Box<std::io::Error>),
+}
+
+impl ExecError {
+    pub fn new(name: &str, expl: &str) -> Self {
+        Self::General(Box::new(Expl {
+            name: name.to_owned(),
+            expl: expl.to_owned(),
+        }))
+    }
+}
+
+#[derive(Debug)]
+struct Expl {
+    name: String,
+    expl: String,
+}
+
+impl Display for Expl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { name, expl } = self;
+        write!(f, "{name}: {expl}")
+    }
 }
 
 #[derive(clap::Parser, Debug)]

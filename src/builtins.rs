@@ -97,6 +97,7 @@ impl Builtin {
 
 pub static BUILTINS: phf::Map<&'static str, Builtin> = phf_map! {
     "alias" => Builtin::Alias,
+    "cd" => Builtin::Cd,
     "command" => Builtin::Command,
     "continue" => Builtin::Continue,
     "eval" => Builtin::Eval,
@@ -118,6 +119,7 @@ pub static BUILTINS: phf::Map<&'static str, Builtin> = phf_map! {
     "set" => Builtin::Set,
     "shift" => Builtin::Shift,
     "test" => Builtin::Test,
+    "[" => Builtin::Test,
     "times" => Builtin::Times,
     "trap" => Builtin::Trap,
     "type" => Builtin::Type,

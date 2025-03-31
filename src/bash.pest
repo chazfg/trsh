@@ -1,5 +1,5 @@
 METACHAR = { PIPE | AMPERSAND | L_PAREN | R_PAREN | L_ANGLE | R_ANGLE | SEMICOLON | WHITESPACE | NEWLINE | CMD_DELIM }
-PIPE                = { "|" }
+PIPE                = _{ "|" }
 AMPERSAND           = { "&" }
 L_PAREN             = { "(" }
 R_PAREN             = { ")" }
@@ -10,8 +10,8 @@ WHITESPACE          = _{ " " | "\t" }
 NEWLINE             = _{ "\n" | "\r\n" }
 CMD_DELIM           = _{ NEWLINE | SEMICOLON }
 
-ASSIGNMENT = @{ WORD ~ "=" ~ QUOTE}
-WORD = @{ "-"? ~ "-"? ~ ASCII_ALPHANUMERIC+ }
+//ASSIGNMENT = @{ WORD ~ "=" ~ QUOTE}
+WORD = @{ "-"? ~ "-"? ~ ASCII_ALPHANUMERIC+ ~ ("." ~ ASCII_ALPHANUMERIC+)? ~ ("/" ~ WORD*)?}
 QUOTE = ${ "\"" ~ inner ~ "\"" }
 inner = @{ char* }
 char = {
@@ -33,24 +33,34 @@ char = {
     
 
 
+
 program             = { command_list }
-command_list        = { command ~ (CMD_DELIM+ ~ command)* }
+command_list        = { and_or ~ (CMD_DELIM+ ~ and_or)* }
+and_or              = { pipeline ~ (LOGICAL_OP+ ~ pipeline)* }
+pipeline            = { command ~ (PIPE ~ command)* }
 command             = _{ if_clause | simple_command }
-if_clause           = { "if" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "then" ~ WHITESPACE+ ~ command_list ~ WHITESPACE+ ~ "fi" }
-simple_command      = {  command_name ~ (command_element ~ ( "="? ~ command_element)*)? }
-command_name        = @{ ASCII_ALPHANUMERIC+ }
+LOGICAL_OP = {"||" | "&&"}
+
+if_clause = { 
+                "if" ~ simple_command ~ CMD_DELIM ~ 
+                "then" ~ simple_command ~ CMD_DELIM ~ 
+                ("else" ~ simple_command ~ CMD_DELIM)? ~ 
+                "fi" }
+simple_command      = {  command_name ~ command_element* }
+command_name = @{ !KEYWORD ~ ASCII_ALPHANUMERIC+ }
+KEYWORD = _{ "if" | "then" | "else" | "fi" | "while" | "do" | "done" }
 
 command_element = _{REDIRECTION | arg}
-arg = { ASSIGNMENT | QUOTE | filename | WORD }
+arg = { QUOTE | EQUATE | WORD }
 
-//argument            = _{ ANY ~ (";" | NEWLINE) }
-//argument   = @{ (("-" | "--")? ~ ASCII_ALPHANUMERIC)+ }
-//quoted_argument     = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
-filename = @{!METACHAR ~ ANY+ ~ ("." ~ ANY+)?}
+EQUATE = _{ EQ | NEQ } 
+EQ = { "=" }
+NEQ = { "!=" }
+
 REDIRECTION         = _{   APPEN_R | HEREDOC | TRUNC_R | INPUT }
-    TRUNC_R       = { ">" ~ filename }
-    INPUT         = { "<" ~ filename }
-    APPEN_R       = { ">>" ~ filename }
+    TRUNC_R       = { ">" ~ WORD }
+    INPUT         = { "<" ~ WORD }
+    APPEN_R       = { ">>" ~ WORD }
     HEREDOC       = { "<<" ~ WORD }
 
 builtin_command     = { 

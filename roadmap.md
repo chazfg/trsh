@@ -17,12 +17,14 @@ For most of these, take them as a _very_ loose interpretation of "Complete"
 - [x] Truncate (Redirection): >
 - [x] HereDoc (Redirection): <<
 - [x] Input (Redirection): <
-- [ ] Pipes
-- [ ] Command Sequencing
+- [x] Pipes
+- [x] Command Sequencing
 
 ## Phase 3: Additional Shell Language
 
-- [ ] Conditionals (if, then, else, fi)
+- [x] Conditionals (if, then, else, fi)
+- [ ] Conditionals (with test/ [)
+- [x] Logic: Ands (&&), ors (||)
 - [ ] loops (while, for)
 - [ ] functions
 
@@ -39,8 +41,9 @@ For most of these, take them as a _very_ loose interpretation of "Complete"
 - [ ] Ensure correctness of exit codes
 - [ ] Script-local scoping
 
-## Stretch Goals
+## Stretch Goals/Long Term
 
+- [ ] logic: grouping/order of ops
 - [ ] subshells
 - [ ] i/o redir w/ FD
 - [ ] !, history, things like that
