@@ -82,8 +82,6 @@ impl Token {
             Rule::QUOTE => Self::Quote(a.as_str().trim_matches('"').to_string()),
             Rule::EQ => Self::Eq,
             Rule::NEQ => Self::Neq,
-            // Rule::ASSIGNMENT => Self::Assignment(a.as_str().to_string()),
-            // Rule::filename => Self::Filename(a.as_str().to_string()),
             Rule::arg => Self::new(a.into_inner().next().unwrap()),
             r => panic!("{r:?}"),
         }
@@ -360,6 +358,7 @@ impl Command {
                 }
                 left
             }
+            Rule::test_cond => Self::Simple(SimpleCommand::new(rule, env, rl)?),
             // Rule::pipe_segment => Self::new(rule.into_inner().next().unwrap(), env, rl)?,
             l => todo!("{:?}", l),
         })

@@ -54,47 +54,6 @@ pub enum Builtin {
     Wait,
 }
 
-impl Builtin {
-    pub fn new(rule: Rule) -> Self {
-        match rule {
-            Rule::colon => Self::Colon,
-            Rule::dot => Self::Dot,
-            Rule::alias => Self::Alias,
-            Rule::bg => Self::Bg,
-            Rule::break_builtin => Self::Break,
-            Rule::cd => Self::Cd,
-            Rule::command_builtin => Self::Command,
-            Rule::continue_builtin => Self::Continue,
-            Rule::eval => Self::Eval,
-            Rule::exec => Self::Exec,
-            Rule::exit_builtin => Self::Exit,
-            Rule::export => Self::Export,
-            Rule::fc => Self::Fc,
-            Rule::fg => Self::Fg,
-            Rule::getopts => Self::Getopts,
-            Rule::hash_builtin => Self::Hash,
-            Rule::jobs => Self::Jobs,
-            Rule::kill => Self::Kill,
-            Rule::pwd => Self::Pwd,
-            Rule::read => Self::Read,
-            Rule::readonly => Self::Readonly,
-            Rule::return_builtin => Self::Return,
-            Rule::set_builtin => Self::Set,
-            Rule::shift => Self::Shift,
-            Rule::test_builtin => Self::Test,
-            Rule::times => Self::Times,
-            Rule::trap => Self::Trap,
-            Rule::type_builtin => Self::Type,
-            Rule::ulimit => Self::Ulimit,
-            Rule::umask => Self::Umask,
-            Rule::unalias => Self::Unalias,
-            Rule::unset => Self::Unset,
-            Rule::wait => Self::Wait,
-            r => panic!("should not have got {r:?}"),
-        }
-    }
-}
-
 pub static BUILTINS: phf::Map<&'static str, Builtin> = phf_map! {
     "alias" => Builtin::Alias,
     "cd" => Builtin::Cd,
