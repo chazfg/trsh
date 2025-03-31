@@ -20,7 +20,6 @@ char = {
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-//control_operator     = _{}
     two_pipe           = { "||" }
     two_and            = { "&&" }
     and                = { "&" }
@@ -38,7 +37,7 @@ program             = { command_list }
 command_list        = { and_or ~ (CMD_DELIM+ ~ and_or)* }
 and_or              = { pipeline ~ (LOGICAL_OP+ ~ pipeline)* }
 pipeline            = { command ~ (PIPE ~ command)* }
-command             = _{ if_clause | simple_command }
+command             = _{ if_clause | while_loop | simple_command }
 LOGICAL_OP = {"||" | "&&"}
 
 if_clause = { 
@@ -46,6 +45,9 @@ if_clause = {
                 "then" ~ simple_command ~ CMD_DELIM ~ 
                 ("else" ~ simple_command ~ CMD_DELIM)? ~ 
                 "fi" }
+
+//while_loop = { "while" ~ command_list ~ CMD_DELIM ~ "do" ~ command_list ~ "do" }
+while_loop = { "while" ~ command_list ~ CMD_DELIM ~ "do" ~ NEWLINE? ~ command_list ~ CMD_DELIM ~ "done"}
 simple_command      = {  command_name ~ command_element* }
 
 test_cond = { L_BRACKET ~ command_element* ~ "]"}

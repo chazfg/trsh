@@ -1,4 +1,3 @@
-use crate::prsr::Rule;
 use phf::phf_map;
 use std::path::PathBuf;
 

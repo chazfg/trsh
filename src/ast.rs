@@ -305,6 +305,12 @@ impl Conditional {
 }
 
 #[derive(Debug)]
+struct WhileLoop {
+    pub condition: Box<Command>,
+    pub body: Box<Command>,
+}
+
+#[derive(Debug)]
 pub enum Command {
     Simple(SimpleCommand),
     Conditional(Conditional),
@@ -312,6 +318,7 @@ pub enum Command {
     Pipeline(Box<Self>, Box<Self>),
     And(Box<Self>, Box<Self>),
     Or(Box<Self>, Box<Self>),
+    WhileLoop(WhileLoop),
 }
 impl Command {
     pub fn new(
