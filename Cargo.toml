@@ -1,6 +1,6 @@
 [package]
 name = "trsh-rs"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 authors = ["CJ Gorey <cjgorey@pm.me>"]
 description = "Attempt to create a posix shell in rust"
