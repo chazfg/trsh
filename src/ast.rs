@@ -8,7 +8,7 @@ use crate::{
     prsr::Rule,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SimpleCommand {
     pub name: CmdName,
     pub args: Vec<CmdArg>,
@@ -19,11 +19,12 @@ pub struct SimpleCommand {
 pub enum Token {
     Word(String),
     Quote(String),
+    VarExp(String),
     Eq,
     Neq,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Redirection {
     AppendRight(String),
     Input(String),
@@ -70,7 +71,7 @@ impl Display for Token {
         match self {
             Token::Eq => write!(f, "="),
             Token::Neq => write!(f, "!="),
-            Token::Word(s) | Token::Quote(s) => write!(f, "{s}"),
+            Token::VarExp(s) | Token::Word(s) | Token::Quote(s) => write!(f, "{s}"),
         }
     }
 }
@@ -83,12 +84,16 @@ impl Token {
             Rule::EQ => Self::Eq,
             Rule::NEQ => Self::Neq,
             Rule::arg => Self::new(a.into_inner().next().unwrap()),
+            Rule::VARIABLE_EXPANSION => {
+                Self::VarExp(a.as_str().strip_prefix("$").unwrap().to_string())
+            }
             r => panic!("{r:?}"),
         }
     }
     pub fn as_str(&self) -> &str {
         match self {
             Token::Word(s) => s,
+            Token::VarExp(s) => s,
             Token::Quote(s) => s,
             Token::Eq => "=",
             Token::Neq => "!=",
@@ -100,6 +105,7 @@ impl std::borrow::Borrow<str> for Token {
     fn borrow(&self) -> &str {
         match self {
             Token::Word(s) => s,
+            Token::VarExp(s) => s,
             Token::Quote(s) => s,
             Token::Eq => "=",
             Token::Neq => "!=",
@@ -112,6 +118,7 @@ impl AsRef<std::ffi::OsStr> for Token {
         match self {
             Token::Word(s) => std::ffi::OsStr::new(s),
             Token::Quote(s) => std::ffi::OsStr::new(s),
+            Token::VarExp(s) => std::ffi::OsStr::new(s),
             Token::Eq => std::ffi::OsStr::new("="),
             Token::Neq => std::ffi::OsStr::new("!="),
             // ValidArg::Assignment(left, right) => std::ffi::OsStr::new(&format!("{left}={right}")),
@@ -147,7 +154,7 @@ impl SimpleCommand {
         let mut tokens = Vec::new();
         for p in parts {
             match p.as_rule() {
-                Rule::arg => tokens.push(Token::new(p)),
+                Rule::arg | Rule::VARIABLE_EXPANSION => tokens.push(Token::new(p)),
                 Rule::APPEN_R => redirections.push(Redirection::AppendRight(
                     p.into_inner().next().unwrap().as_str().to_owned(),
                 )),
@@ -190,6 +197,7 @@ impl SimpleCommand {
             Token::Quote(q) => args.push(CmdArg::Quoted(q)),
             Token::Eq => args.push(CmdArg::OpEq),
             Token::Neq => args.push(CmdArg::OpNeq),
+            Token::VarExp(v) => args.push(CmdArg::Variable(v)),
         });
         Ok(Self {
             name,
@@ -199,7 +207,7 @@ impl SimpleCommand {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum CmdArg {
     /// Regular positional argument like `ls`, `-l`, or `file.txt`
     Arg(String),
@@ -259,7 +267,7 @@ impl Display for CmdArg {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Conditional {
     pub condition: Box<Command>,
     pub then_branch: Box<Command>,
@@ -286,16 +294,6 @@ impl Conditional {
         let else_branch = parts
             .next()
             .map(|p| Box::new(Command::new(p, env, rl).unwrap()));
-        // Box::new(Command::new(
-        //     parts.next().ok_or(AstError::IncompleteConditional)?,
-        //     env,
-        //     rl,
-        // )?);
-        // let else_branch = Box::new(Command::new(
-        //     parts.next().ok_or(AstError::IncompleteConditional)?,
-        //     env,
-        //     rl,
-        // )?);
         Ok(Self {
             condition,
             then_branch,
@@ -304,13 +302,13 @@ impl Conditional {
     }
 }
 
-#[derive(Debug)]
-struct WhileLoop {
+#[derive(Debug, Clone)]
+pub struct WhileLoop {
     pub condition: Box<Command>,
     pub body: Box<Command>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Command {
     Simple(SimpleCommand),
     Conditional(Conditional),
@@ -366,6 +364,13 @@ impl Command {
                 left
             }
             Rule::test_cond => Self::Simple(SimpleCommand::new(rule, env, rl)?),
+            Rule::while_loop => {
+                let mut iter = rule.into_inner();
+                Self::WhileLoop(WhileLoop {
+                    condition: Box::new(Self::new(iter.next().unwrap(), env, rl)?),
+                    body: Box::new(Self::new(iter.next().unwrap(), env, rl)?),
+                })
+            }
             // Rule::pipe_segment => Self::new(rule.into_inner().next().unwrap(), env, rl)?,
             l => todo!("{:?}", l),
         })

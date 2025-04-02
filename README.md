@@ -38,7 +38,7 @@ phase 5 I don't think I'll worry much about complete end to end testing. So it's
 
 ## Phase 3: Shell Language Features
 
-- [ ] Variable Expansion $VAR
+- [x] Variable Expansion $VAR
 - [ ] loops (while, for)
 - [ ] Command Sub $(...)
 - [ ] Comprehensive Quote Handling

@@ -22,6 +22,8 @@ pub enum Builtin {
     Readarray,
     Source,
     Shopt,
+    True,
+    False,
     Bg,
     Break,
     Cd,
@@ -59,12 +61,15 @@ pub static BUILTINS: phf::Map<&'static str, Builtin> = phf_map! {
     "command" => Builtin::Command,
     "continue" => Builtin::Continue,
     "eval" => Builtin::Eval,
+    "echo" => Builtin::Echo,
     "exit" => Builtin::Exit,
     "export" => Builtin::Export,
     "pwd" => Builtin::Pwd,
     "bg" => Builtin::Bg,
     "break" => Builtin::Break,
     "exec" => Builtin::Exec,
+    "true" => Builtin::True,
+    "false" => Builtin::False,
     "fc" => Builtin::Fc,
     "fg" => Builtin::Fg,
     "getopts" => Builtin::Getopts,
@@ -88,7 +93,7 @@ pub static BUILTINS: phf::Map<&'static str, Builtin> = phf_map! {
     "wait" => Builtin::Wait,
 };
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum CmdName {
     Builtin(Builtin),
     Path(PathBuf),

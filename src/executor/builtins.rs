@@ -1,4 +1,5 @@
 use std::{
+    io::Write,
     os::unix::process::ExitStatusExt,
     process::{ExitStatus, Stdio},
 };
@@ -7,7 +8,7 @@ use crate::{TrshError, TrshResult, ast::CmdArg, builtins::Builtin, executor::exi
 
 use super::{
     Executor,
-    utils::{BINARY_TESTS, UNARY_TESTS},
+    utils::{BINARY_TESTS, UNARY_TESTS, exit_num},
 };
 
 impl Executor {
@@ -59,7 +60,7 @@ impl Executor {
             Builtin::Builtin => todo!(),
             Builtin::Caller => todo!(),
             Builtin::Declare => todo!(),
-            Builtin::Echo => todo!(),
+            Builtin::Echo => self.echo(args),
             Builtin::Enable => todo!(),
             Builtin::Help => todo!(),
             Builtin::Let => todo!(),
@@ -70,7 +71,31 @@ impl Executor {
             Builtin::Readarray => todo!(),
             Builtin::Source => todo!(),
             Builtin::Shopt => todo!(),
+            Builtin::True => Ok(exit_zero()),
+            Builtin::False => Ok(exit_num(1)),
         }
+    }
+
+    fn echo(&mut self, args: Vec<CmdArg>) -> TrshResult<ExitStatus> {
+        println!(
+            "{}",
+            args.into_iter()
+                .map(|a| match a {
+                    CmdArg::Arg(a) => a,
+                    CmdArg::Assignment(l, r) => format!("{}={}", l, r),
+                    CmdArg::Quoted(q) => q,
+                    CmdArg::OpEq => "=".to_owned(),
+                    CmdArg::OpNeq => "!=".to_owned(),
+                    CmdArg::Variable(v) => match self.env_vars.get(&v) {
+                        Some(o) => o.clone(),
+                        None => "".to_owned(),
+                    },
+                    CmdArg::CommandSub(_) => todo!(),
+                })
+                .collect::<Vec<String>>()
+                .join(" ")
+        );
+        Ok(exit_zero())
     }
 
     fn handle_alias(&mut self, args: Vec<CmdArg>) -> TrshResult<ExitStatus> {

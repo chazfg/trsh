@@ -5,7 +5,7 @@ mod utils;
 
 use crate::{
     ExecError, Program, TrshError, TrshResult,
-    ast::{CmdArg, Command, Conditional, Redirection, SimpleCommand},
+    ast::{CmdArg, Command, Conditional, Redirection, SimpleCommand, WhileLoop},
     builtins::CmdName,
     prsr::{Rule, TrshPrsr},
 };
@@ -18,12 +18,13 @@ use std::{
 };
 
 pub struct Executor {
-    env_vars: HashMap<String, String>, // Shell's environment variables
-    cwd: PathBuf,                      // Current working directory (internal state)
+    env_vars: HashMap<String, String>,
+    vars: HashMap<String, String>,
+    cwd: PathBuf,
     home_dir: PathBuf,
-    last_status: i32,                   // Last command's exit code ($?)
-    aliases: HashMap<String, String>,   // Alias table
-    functions: HashMap<String, String>, // Optional later
+    last_status: i32,
+    aliases: HashMap<String, String>,
+    functions: HashMap<String, String>,
     std_out: Stdout,
 }
 impl Display for Executor {
@@ -48,8 +49,10 @@ impl Executor {
         let home_dir = dirs::home_dir().unwrap();
         let std_out = io::stdout();
         let env_vars = std::env::vars().collect();
+        let vars = HashMap::new();
         Self {
             env_vars,
+            vars,
             cwd,
             home_dir,
             last_status: 0,
@@ -118,6 +121,17 @@ impl Executor {
                 } else {
                     Ok(left_status)
                 }
+            }
+            Command::WhileLoop(WhileLoop { condition, body }) => {
+                while self
+                    .exec(*condition.clone(), None, None)
+                    .is_ok_and(|tf| tf.success())
+                {
+                    self.exec(*body.clone(), None, None)?;
+                }
+                Ok(exit_zero())
+                // let r = self.exec(*condition, None, None);
+                // println!("{r:?}");
             }
         }
     }

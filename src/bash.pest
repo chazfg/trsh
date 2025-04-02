@@ -11,6 +11,7 @@ NEWLINE             = _{ "\n" | "\r\n" }
 CMD_DELIM           = _{ NEWLINE | SEMICOLON }
 
 //ASSIGNMENT = @{ WORD ~ "=" ~ QUOTE}
+VARIABLE_EXPANSION = @{ "$" ~ ASCII_ALPHANUMERIC+ }
 WORD = @{ "-"? ~ "-"? ~ ASCII_ALPHANUMERIC+ ~ ("." ~ ASCII_ALPHANUMERIC+)? ~ ("/" ~ WORD*)?}
 QUOTE = ${ "\"" ~ inner ~ "\"" }
 inner = @{ char* }
@@ -55,7 +56,7 @@ test_cond = { L_BRACKET ~ command_element* ~ "]"}
 command_name = @{ !KEYWORD ~ ASCII_ALPHANUMERIC+ }
 KEYWORD = _{ "if" | "then" | "else" | "fi" | "while" | "do" | "done" }
 
-command_element = _{REDIRECTION | arg}
+command_element = _{REDIRECTION | VARIABLE_EXPANSION | arg}
 arg = { QUOTE | EQUATE | WORD }
 
 EQUATE = _{ EQ | NEQ } 
